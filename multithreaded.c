@@ -5,6 +5,8 @@
 #include <sys/types.h>
 #include <dirent.h>
 #include <string.h>
+#include <assert.h>
+#include <pthread.h>
 
 // For this implementation, I used a linked-list implementation for the queue.
 struct queueNode {
@@ -15,6 +17,7 @@ struct queueNode {
 struct queue {
     struct queueNode *front;
     struct queueNode *rear;
+    pthread_mutex_t  frontLock, rearLock;
 };
 
 struct queue Q;
@@ -24,6 +27,9 @@ void initQueue(struct queue *Q);
 int isEmpty(struct queue *Q);
 void enqueue(struct queue *Q, char *x);
 char * dequeue(struct queue *Q);
+
+// Function for handling threads
+void threadHandler(char* rootpath, const char* search_string, struct queue Q);
 
 // Functions for running grep
 void grepRunner(char* rootpath, const char* search_string, struct queue Q);
@@ -63,6 +69,9 @@ int main(int argc, char* argv[]) {
         free(rel);
     }
 
+    // Destroy the created locks
+    pthread_mutex_destroy(&Q.frontLock);
+    pthread_mutex_destroy(&Q.rearLock);
     return 0;
 }
 
@@ -78,6 +87,13 @@ void grepRunner(char* rootpath, const char* search_string, struct queue Q) {
     while(!isEmpty(&Q)) {
         // str is path the directory enqueued
         str = dequeue(&Q);
+
+        // Should be impossible to trigger. Just placed for safety purposes.
+        if (strcmp(str, "null") == 1) {
+            break;
+        }
+
+        // Expected flow of program
         dir = opendir(str);
         
         while ((entry = readdir(dir)) != NULL) {
@@ -120,6 +136,8 @@ void grepRunner(char* rootpath, const char* search_string, struct queue Q) {
 // Linked list operations
 void initQueue(struct queue *Q) {
     Q->front = NULL;
+    pthread_mutex_init(&Q->frontLock, NULL);
+    pthread_mutex_init(&Q->rearLock, NULL);
 }
 
 int isEmpty(struct queue *Q) {
@@ -130,33 +148,45 @@ void enqueue(struct queue *Q, char *x) {
     struct queueNode *alpha;
     alpha = (struct queueNode *) malloc(sizeof(struct queueNode));
 
-    // Assume that queue overflow would not happen
+    assert(alpha != NULL);
+
     char *str = malloc(sizeof(char)*500); 
     strcpy(str, x);
 
     alpha->info = str;
     alpha->link = NULL;
 
+    pthread_mutex_lock(&Q->rearLock);
     if (Q->front == NULL) {
+        pthread_mutex_lock(&Q->frontLock);
         Q->front = alpha;
+        pthread_mutex_unlock(&Q->frontLock);
         Q->rear = alpha;
     }
     else {
         Q->rear->link = alpha;
         Q->rear = alpha;
     }
+    pthread_mutex_unlock(&Q->rearLock);
 }
 
 char * dequeue(struct queue *Q) {
+    pthread_mutex_lock(&Q->frontLock);
     char *x;
     struct queueNode *alpha;
 
-    // Assume that queue underflow would not happen
-    x = Q->front->info;
     alpha = Q->front;
-    Q->front = Q->front->link;
-    free(alpha);
 
+    // Implies that queue is empty
+    if (alpha == NULL) {
+        pthread_mutex_unlock(&Q->frontLock);
+        return "null"; 
+    }
+    x = Q->front->info;
+    Q->front = Q->front->link;
+    pthread_mutex_unlock(&Q->frontLock);
+
+    free(alpha);
     printf("[0] DIR %s\n", x);
     return x;
 }
