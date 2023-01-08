@@ -5,6 +5,7 @@
 #include <sys/types.h>
 #include <dirent.h>
 #include <string.h>
+#include <assert.h>
 
 // For this implementation, I used a linked-list implementation for the queue.
 struct queueNode {
@@ -130,7 +131,8 @@ void enqueue(struct queue *Q, char *x) {
     struct queueNode *alpha;
     alpha = (struct queueNode *) malloc(sizeof(struct queueNode));
 
-    // Assume that queue overflow would not happen
+    assert(alpha != NULL);
+
     char *str = malloc(sizeof(char)*500); 
     strcpy(str, x);
 
@@ -151,9 +153,10 @@ char * dequeue(struct queue *Q) {
     char *x;
     struct queueNode *alpha;
 
-    // Assume that queue underflow would not happen
-    x = Q->front->info;
     alpha = Q->front;
+    assert(alpha != NULL);
+
+    x = Q->front->info;
     Q->front = Q->front->link;
     free(alpha);
 
