@@ -19,13 +19,15 @@ struct queue {
 
 struct queue Q;
 
+// Functions for queue operations
 void initQueue(struct queue *Q);
 int isEmpty(struct queue *Q);
 void enqueue(struct queue *Q, char *x);
 char * dequeue(struct queue *Q);
 
-
+// Functions for running grep
 void grepRunner(char* rootpath, const char* search_string, struct queue Q);
+void formPathName(char *path, char *str, char *entryName);
 
 int main(int argc, char* argv[]) {
     //Assume that the program will be used correctly.
@@ -50,13 +52,11 @@ int main(int argc, char* argv[]) {
         grepRunner(rootpath, search_string, Q);
     }
     else {
-        // Do I assume that the input will always be a directory agad??
         char *rel = get_current_dir_name();
         char *rtpath = malloc(sizeof(char *)*255);
         strcpy(rtpath, rel);
         strcat(rtpath, "/");
         strcat(rtpath, rootpath);
-        //printf("%s\n", rtpath);
         enqueue(&Q, rtpath);
         grepRunner(rtpath, search_string, Q);
         free(rtpath);
@@ -76,12 +76,14 @@ void grepRunner(char* rootpath, const char* search_string, struct queue Q) {
     int returnValue;
 
     while(!isEmpty(&Q)) {
-        // str is the directory enqueued
+        // str is path the directory enqueued
         str = dequeue(&Q);
         dir = opendir(str);
         
         while ((entry = readdir(dir)) != NULL) {
+            // entry is a regular file
             if (entry->d_type == 8) {
+                // Invoke grep
                 strcpy(command, "grep ");
                 strcat(command, search_string);
                 strcat(command, " ");
@@ -89,25 +91,22 @@ void grepRunner(char* rootpath, const char* search_string, struct queue Q) {
                 strcat(command, "/");
                 strcat(command, entry->d_name);
                 strcat(command, " 1> /dev/null 2> /dev/null");
-                //printf("%s\n", command); // Debug
-                returnValue = system(command);
+
+                // Return value after invoking grep (i.e. to indicate if search_string is present)
+                returnValue = system(command);  
+
                 if (returnValue == 0) {
-                    strcpy(path, str);
-                    strcat(path, "/");
-                    strcat(path, entry->d_name);
+                    formPathName(path, str, entry->d_name);
                     printf("[0] PRESENT %s\n", path);
                 }
                 else {
-                    strcpy(path, str);
-                    strcat(path, "/");
-                    strcat(path, entry->d_name);
+                    formPathName(path, str, entry->d_name);
                     printf("[0] ABSENT %s\n", path);
                 }
             }
-            if (entry->d_type == 4 && strcmp(entry->d_name, ".") != 0 && strcmp(entry->d_name, "..") != 0) {
-                strcpy(path1, str);
-                strcat(path1, "/");
-                strcat(path1, entry->d_name);
+            // entry is a directory
+            else if (entry->d_type == 4 && strcmp(entry->d_name, ".") != 0 && strcmp(entry->d_name, "..") != 0) {
+                formPathName(path1, str, entry->d_name);
                 enqueue(&Q, path1);
             }
         }
@@ -118,6 +117,7 @@ void grepRunner(char* rootpath, const char* search_string, struct queue Q) {
     free(path1);
 }
 
+// Linked list operations
 void initQueue(struct queue *Q) {
     Q->front = NULL;
 }
@@ -159,4 +159,11 @@ char * dequeue(struct queue *Q) {
 
     printf("[0] DIR %s\n", x);
     return x;
+}
+
+// Helper function for grepRunner
+void formPathName(char *path, char *str, char *entryName) {
+    strcpy(path, str);
+    strcat(path, "/");
+    strcat(path, entryName);
 }
