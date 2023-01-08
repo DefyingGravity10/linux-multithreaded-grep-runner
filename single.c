@@ -79,8 +79,14 @@ void grepRunner(char* rootpath, const char* search_string, struct queue Q) {
     while(!isEmpty(&Q)) {
         // str is path the directory enqueued
         str = dequeue(&Q);
-        dir = opendir(str);
         
+        // Should be impossible to trigger. Just placed for safety purposes.
+        if (strcmp(str, "null") == 1) {
+            break;
+        }
+
+        // Expected flow of program
+        dir = opendir(str);
         while ((entry = readdir(dir)) != NULL) {
             // entry is a regular file
             if (entry->d_type == 8) {
@@ -154,7 +160,11 @@ char * dequeue(struct queue *Q) {
     struct queueNode *alpha;
 
     alpha = Q->front;
-    assert(alpha != NULL);
+
+    // Implies that queue is empty
+    if (alpha == NULL) {
+        x = "null";
+    }
 
     x = Q->front->info;
     Q->front = Q->front->link;
