@@ -163,7 +163,7 @@ char * dequeue(struct queue *Q) {
 
     // Implies that queue is empty
     if (alpha == NULL) {
-        x = "null";
+        return "null";
     }
 
     x = Q->front->info;
