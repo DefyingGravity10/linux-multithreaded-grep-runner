@@ -81,6 +81,8 @@ int main(int argc, char* argv[]) {
 
     // Necessary so that we will not have memory leaks
     free(Q.front);
+    pthread_mutex_destroy(&Q.frontLock);
+    pthread_mutex_destroy(&Q.rearLock);
 
     return 0;
 }
