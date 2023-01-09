@@ -9,7 +9,7 @@
 #include <assert.h>
 #include <pthread.h>
 
-// For this implementation, I used a linked-list implementation for the queue.
+// For this implementation, a linked-list implementation for the queue was used.
 struct queueNode {
     char *info;
     struct queueNode *next;
@@ -21,13 +21,13 @@ struct queue {
     pthread_mutex_t  frontLock, rearLock;
 };
 
-// Are global variables
+// Global variables used
 struct queue Q;
 pthread_mutex_t threadLock;
 pthread_cond_t threadQueue;
 int numActiveThreads = 0;
 
-// A struct variable to contain the paramters needed by each thread
+// A struct variable to contain the parameters needed by each thread
 struct threadData {
     char *str;
     const char *searchString;
@@ -40,7 +40,7 @@ int isEmpty(struct queue *Q);
 void enqueue(struct queue *Q, char *x);
 int dequeue(struct queue *Q, char **x);
 
-// For grep runner
+// Functions that facilitate in performing parallelized grep
 void threadCreator(const char *search_string, long N);
 void threadHandler(struct threadData *t_data);
 void grepRunner(struct threadData *t_data);
@@ -52,17 +52,19 @@ int main(int argc, char* argv[]) {
     //Hence, argv[n] will not result to a NULL pointer.
     //We also assume that the path is correctly formatted.
 
-    char *numberOfWorkers = argv[1];  // This is ignored for now
+    char *numberOfWorkers = argv[1]; 
     char *rootpath = argv[2];
     const char *search_string = argv[3];
 
-    // Process N
+    // Process the number of workers
     char *extra;
     long N;
     N = strtol(numberOfWorkers, &extra, 10);
 
     // Initialize the queue
     initQueue(&Q);
+
+    // Initialize the mutex threadLock and the cond variable threadQueue
     if (pthread_mutex_init(&threadLock, NULL) != 0) {
         printf("Mutex threadLock has failed\n");
     }
@@ -71,11 +73,11 @@ int main(int argc, char* argv[]) {
     }
     
     // Check if the path provided is a relative or absolute path
-    if (rootpath[0] == '/') {
+    if (rootpath[0] == '/') {   // Absolute
         enqueue(&Q, rootpath);
         threadCreator(search_string, N);
     }
-    else {
+    else {  // Relative
         char *rel = get_current_dir_name();
         char *rtpath = malloc(sizeof(char *)*255);
         strcpy(rtpath, rel);
@@ -89,10 +91,10 @@ int main(int argc, char* argv[]) {
 
     // Necessary so that we will not have memory leaks
     free(Q.front);
+
+    // Destroy the mutexes/cond variables used
     pthread_mutex_destroy(&Q.frontLock);
     pthread_mutex_destroy(&Q.rearLock);
-    
-    // Destroy the mutex and condition variable
     pthread_mutex_destroy(&threadLock);
     pthread_cond_destroy(&threadQueue);
 
@@ -100,6 +102,7 @@ int main(int argc, char* argv[]) {
 }
 
 // Functions that handle queue operations
+
 void initQueue(struct queue *Q) {
     // Create a new node to be placed in queue
     struct queueNode *alpha;
@@ -109,7 +112,7 @@ void initQueue(struct queue *Q) {
     Q->front = alpha;
     Q->rear = alpha;
 
-    // Initialize the locks to be used
+    // Initialize the locks to be used for the queue
     pthread_mutex_init(&Q->frontLock, NULL);
     pthread_mutex_init(&Q->rearLock, NULL);    
 }
@@ -159,11 +162,12 @@ int dequeue(struct queue *Q, char **x) {
     return 0;
 }
 
-// Functions that handle the grep handler logic
+// Functions that help the program perform a parallelized grep runner
 void threadCreator(const char *search_string, long N) {
     pthread_t threads[N];
-    struct threadData t_data[N];
+    struct threadData t_data[N];    // Used to store all the "data" needed by each thread
 
+    // Thread creation
     for (int i=0; i<N; i++) {
         t_data[i].searchString = search_string;
         t_data[i].workerNumber = i;
@@ -173,25 +177,26 @@ void threadCreator(const char *search_string, long N) {
     for (int i=0; i<N; i++) {
         pthread_join(threads[i], NULL);
     }
-    printf("Finished\n");
 }
 
 void threadHandler(struct threadData *t_data) {
-    // Will be used to hold the dequeued paths
     pthread_mutex_lock(&threadLock);
-    char *str;
+    char *str;  // Will be used to hold the dequeued paths
     while(1) {
-        while (isEmpty(&Q) && numActiveThreads > 0) {
+        // Sends a thread to sleep if it is expected to be used again later
+        while (isEmpty(&Q) && numActiveThreads > 0) {   
             pthread_cond_wait(&threadQueue, &threadLock);
         }
+        // Implies that no more content will be enqueued into the task queue
         if (isEmpty(&Q) && numActiveThreads == 0) {
             break;
         }
 
-        // Dequeue
+        // Dequeue next task from task queue
         if (dequeue(&Q, &str) == -1) {
             break;
         }
+        // Update str (i.e. the directory)
         t_data->str = str;
         numActiveThreads++;
         printf("[%d] DIR %s\n", t_data->workerNumber, str);
