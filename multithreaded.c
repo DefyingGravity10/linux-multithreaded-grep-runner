@@ -206,8 +206,9 @@ void threadHandler(struct threadData *t_data) {
 
         pthread_mutex_lock(&threadLock);
         numActiveThreads--;
-        pthread_cond_broadcast(&threadQueue);
+        pthread_cond_signal(&threadQueue);
     }
+    pthread_cond_signal(&threadQueue);
     pthread_mutex_unlock(&threadLock);
 }
 
