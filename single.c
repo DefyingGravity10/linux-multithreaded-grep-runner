@@ -7,7 +7,6 @@
 #include <dirent.h>
 #include <string.h>
 #include <assert.h>
-#include <pthread.h>
 
 // For this implementation, I used a linked-list implementation for the queue.
 struct queueNode {
@@ -18,7 +17,6 @@ struct queueNode {
 struct queue {
     struct queueNode *front;
     struct queueNode *rear;
-    pthread_mutex_t  frontLock, rearLock;
 };
 
 // Is a global variable
@@ -94,10 +92,6 @@ void initQueue(struct queue *Q) {
     alpha->next = NULL;
     Q->front = alpha;
     Q->rear = alpha;
-
-    // Initialize the locks to be used
-    pthread_mutex_init(&Q->frontLock, NULL);
-    pthread_mutex_init(&Q->rearLock, NULL);    
 }
 
 int isEmpty(struct queue *Q) {
@@ -200,6 +194,7 @@ void grepRunner(struct threadData *t_data) {
         }
         else if (entry->d_type == 4 && strcmp(entry->d_name, ".") != 0 && strcmp(entry->d_name, "..") != 0) {
                 formPathName(path, t_data->str, entry->d_name);
+                printf("[%d] ENQUEUE %s\n", t_data->workerNumber, path);
                 enqueue(&Q, path);
         }
     }
