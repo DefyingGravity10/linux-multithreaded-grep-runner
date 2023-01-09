@@ -1,3 +1,4 @@
+// Include all the libraries we need
 #define _GNU_SOURCE
 #include <stdio.h>
 #include <stdlib.h>
@@ -6,29 +7,42 @@
 #include <dirent.h>
 #include <string.h>
 #include <assert.h>
+#include <pthread.h>
 
 // For this implementation, I used a linked-list implementation for the queue.
 struct queueNode {
     char *info;
-    struct queueNode *link;
+    struct queueNode *next;
 };
 
 struct queue {
     struct queueNode *front;
     struct queueNode *rear;
+    pthread_mutex_t  frontLock, rearLock;
 };
 
+// Is a global variable
 struct queue Q;
 
-// Functions for queue operations
+// A struct variable to contain the paramters needed by each thread
+struct threadData {
+    char *str;
+    const char *searchString;
+    uint workerNumber;
+};
+
+// For queue operations
 void initQueue(struct queue *Q);
 int isEmpty(struct queue *Q);
 void enqueue(struct queue *Q, char *x);
-char * dequeue(struct queue *Q);
+int dequeue(struct queue *Q, char **x);
 
-// Functions for running grep
-void grepRunner(char* rootpath, const char* search_string, struct queue Q);
+// For grep runner
+void threadCreator(const char *search_string);
+void threadHandler(struct threadData *t_data);
+void grepRunner(struct threadData *t_data);
 void formPathName(char *path, char *str, char *entryName);
+
 
 int main(int argc, char* argv[]) {
     //Assume that the program will be used correctly.
@@ -45,12 +59,13 @@ int main(int argc, char* argv[]) {
     //long N;
     //N = strtol(numberOfWorkers, &extra, 10);
 
-    // Prepare the queue to be used
+    // Initialize the queue
     initQueue(&Q);
 
+    // Check if the path provided is a relative or absolute path
     if (rootpath[0] == '/') {
         enqueue(&Q, rootpath);
-        grepRunner(rootpath, search_string, Q);
+        threadCreator(search_string);
     }
     else {
         char *rel = get_current_dir_name();
@@ -59,78 +74,34 @@ int main(int argc, char* argv[]) {
         strcat(rtpath, "/");
         strcat(rtpath, rootpath);
         enqueue(&Q, rtpath);
-        grepRunner(rtpath, search_string, Q);
-        free(rtpath);
+        threadCreator(search_string);
         free(rel);
+        free(rtpath);
     }
+
+    // Necessary so that we will not have memory leaks
+    free(Q.front);
 
     return 0;
 }
 
-void grepRunner(char* rootpath, const char* search_string, struct queue Q) {
-    DIR *dir;
-    struct dirent *entry;
-    char command[500];
-    char *path = malloc(sizeof(char *)*255);
-    char *path1 = malloc(sizeof(char *)*255);
-    char *str;
-    int returnValue;
-
-    while(!isEmpty(&Q)) {
-        // str is path the directory enqueued
-        str = dequeue(&Q);
-        
-        // Should be impossible to trigger. Just placed for safety purposes.
-        if (strcmp(str, "null") == 1) {
-            break;
-        }
-
-        // Expected flow of program
-        dir = opendir(str);
-        while ((entry = readdir(dir)) != NULL) {
-            // entry is a regular file
-            if (entry->d_type == 8) {
-                // Invoke grep
-                strcpy(command, "grep ");
-                strcat(command, search_string);
-                strcat(command, " ");
-                strcat(command, str);
-                strcat(command, "/");
-                strcat(command, entry->d_name);
-                strcat(command, " 1> /dev/null 2> /dev/null");
-
-                // Return value after invoking grep (i.e. to indicate if search_string is present)
-                returnValue = system(command);  
-
-                if (returnValue == 0) {
-                    formPathName(path, str, entry->d_name);
-                    printf("[0] PRESENT %s\n", path);
-                }
-                else {
-                    formPathName(path, str, entry->d_name);
-                    printf("[0] ABSENT %s\n", path);
-                }
-            }
-            // entry is a directory
-            else if (entry->d_type == 4 && strcmp(entry->d_name, ".") != 0 && strcmp(entry->d_name, "..") != 0) {
-                formPathName(path1, str, entry->d_name);
-                enqueue(&Q, path1);
-            }
-        }
-        closedir(dir);
-        free(str);
-    }
-    free(path);
-    free(path1);
-}
-
-// Linked list operations
+// Functions that handle queue operations
 void initQueue(struct queue *Q) {
-    Q->front = NULL;
+    // Create a new node to be placed in queue
+    struct queueNode *alpha;
+    alpha = (struct queueNode *) malloc(sizeof(struct queueNode));
+
+    alpha->next = NULL;
+    Q->front = alpha;
+    Q->rear = alpha;
+
+    // Initialize the locks to be used
+    pthread_mutex_init(&Q->frontLock, NULL);
+    pthread_mutex_init(&Q->rearLock, NULL);    
 }
 
 int isEmpty(struct queue *Q) {
-    return(Q->front == NULL);
+    return (Q->front->next == NULL);
 }
 
 void enqueue(struct queue *Q, char *x) {
@@ -139,42 +110,103 @@ void enqueue(struct queue *Q, char *x) {
 
     assert(alpha != NULL);
 
-    char *str = malloc(sizeof(char)*500); 
+    // Create a new copy of the str
+    char *str = malloc(sizeof(char)*255); 
     strcpy(str, x);
 
+    // Points to str
     alpha->info = str;
-    alpha->link = NULL;
+    alpha->next = NULL;
 
-    if (Q->front == NULL) {
-        Q->front = alpha;
-        Q->rear = alpha;
-    }
-    else {
-        Q->rear->link = alpha;
-        Q->rear = alpha;
-    }
+    // Add lock here
+    Q->rear->next = alpha;
+    Q->rear = alpha;
+    // Unlock here
 }
 
-char * dequeue(struct queue *Q) {
-    char *x;
-    struct queueNode *alpha;
+int dequeue(struct queue *Q, char **x) {
+    // Lock here
+    struct queueNode *temp = Q->front;
+    struct queueNode *alpha = Q->front->next;
 
-    alpha = Q->front;
-
-    // Implies that queue is empty
     if (alpha == NULL) {
-        return "null";
+        // Unlock
+        return -1;
     }
 
-    x = Q->front->info;
-    Q->front = Q->front->link;
-    free(alpha);
+    // Let x be the new string
+    *x = alpha->info;
+    Q->front = alpha;
+    // Unlock
 
-    printf("[0] DIR %s\n", x);
-    return x;
+    free(temp);
+    return 0;
 }
 
-// Helper function for grepRunner
+// Functions that handle the grep handler logic
+void threadCreator(const char *search_string) {
+    // For now, the struct will only be created to accomodate one worker
+    struct threadData t_data[1];
+    t_data[0].searchString = search_string;
+    t_data[0].workerNumber = 0;
+    threadHandler(&t_data[0]);
+}
+
+void threadHandler(struct threadData *t_data) {
+    // Will be used to hold the dequeued paths
+    char *str;
+    while(!isEmpty(&Q)) {
+        if (dequeue(&Q, &str) == -1) {
+            break;
+        }
+        t_data->str = str;
+        printf("[%d] DIR %s\n", t_data->workerNumber, str);
+        grepRunner(t_data);
+    }
+}
+
+void grepRunner(struct threadData *t_data) {
+    // Initialization of required components
+    DIR *dir;
+    struct dirent *entry;
+    char command[500];
+    char path[255];
+    int returnValue;
+
+    dir = opendir(t_data->str);
+    while ((entry = readdir(dir)) != NULL) {
+        // Implies that the entry is a regular file
+        if (entry->d_type == 8) {
+            // Create the grep command to be used
+            strcpy(command, "grep ");
+            strcat(command, t_data->searchString);
+            strcat(command, " ");
+            strcat(command, t_data->str);
+            strcat(command, "/");
+            strcat(command, entry->d_name);
+            strcat(command, " 1> /dev/null 2> /dev/null");
+
+            // Return value after invoking grep (i.e. to indicate if search_string is present)
+            returnValue = system(command);
+
+            if (returnValue == 0) {
+                formPathName(path, t_data->str, entry->d_name);
+                printf("[%d] PRESENT %s\n", t_data->workerNumber, path);
+            }
+            else {
+                formPathName(path, t_data->str, entry->d_name);
+                printf("[%d] ABSENT %s\n", t_data->workerNumber, path);                
+            }
+        }
+        else if (entry->d_type == 4 && strcmp(entry->d_name, ".") != 0 && strcmp(entry->d_name, "..") != 0) {
+                formPathName(path, t_data->str, entry->d_name);
+                enqueue(&Q, path);
+        }
+    }
+    closedir(dir);
+    free(t_data->str);
+}
+
 void formPathName(char *path, char *str, char *entryName) {
     strcpy(path, str);
     strcat(path, "/");
