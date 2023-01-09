@@ -21,8 +21,11 @@ struct queue {
     pthread_mutex_t  frontLock, rearLock;
 };
 
-// Is a global variable
+// Are global variables
 struct queue Q;
+pthread_mutex_t threadLock;
+pthread_cond_t threadQueue;
+int numActiveThreads = 0;
 
 // A struct variable to contain the paramters needed by each thread
 struct threadData {
@@ -38,7 +41,7 @@ void enqueue(struct queue *Q, char *x);
 int dequeue(struct queue *Q, char **x);
 
 // For grep runner
-void threadCreator(const char *search_string);
+void threadCreator(const char *search_string, long N);
 void threadHandler(struct threadData *t_data);
 void grepRunner(struct threadData *t_data);
 void formPathName(char *path, char *str, char *entryName);
@@ -53,19 +56,24 @@ int main(int argc, char* argv[]) {
     char *rootpath = argv[2];
     const char *search_string = argv[3];
 
-    // This portion is not directly helpful for single.c, which explains 
-    // why they are commented out.
-    //char *extra;
-    //long N;
-    //N = strtol(numberOfWorkers, &extra, 10);
+    // Process N
+    char *extra;
+    long N;
+    N = strtol(numberOfWorkers, &extra, 10);
 
     // Initialize the queue
     initQueue(&Q);
-
+    if (pthread_mutex_init(&threadLock, NULL) != 0) {
+        printf("Mutex threadLock has failed\n");
+    }
+    if (pthread_cond_init(&threadQueue, NULL) != 0) {
+        printf("Cond variable threadQueue has failed\n");
+    }
+    
     // Check if the path provided is a relative or absolute path
     if (rootpath[0] == '/') {
         enqueue(&Q, rootpath);
-        threadCreator(search_string);
+        threadCreator(search_string, N);
     }
     else {
         char *rel = get_current_dir_name();
@@ -74,7 +82,7 @@ int main(int argc, char* argv[]) {
         strcat(rtpath, "/");
         strcat(rtpath, rootpath);
         enqueue(&Q, rtpath);
-        threadCreator(search_string);
+        threadCreator(search_string, N);
         free(rel);
         free(rtpath);
     }
@@ -83,6 +91,10 @@ int main(int argc, char* argv[]) {
     free(Q.front);
     pthread_mutex_destroy(&Q.frontLock);
     pthread_mutex_destroy(&Q.rearLock);
+    
+    // Destroy the mutex and condition variable
+    pthread_mutex_destroy(&threadLock);
+    pthread_cond_destroy(&threadQueue);
 
     return 0;
 }
@@ -120,10 +132,12 @@ void enqueue(struct queue *Q, char *x) {
     alpha->info = str;
     alpha->next = NULL;
 
+    pthread_mutex_lock(&threadLock);
     pthread_mutex_lock(&Q->rearLock);
     Q->rear->next = alpha;
     Q->rear = alpha;
     pthread_mutex_unlock(&Q->rearLock);
+    pthread_mutex_unlock(&threadLock);
 }
 
 int dequeue(struct queue *Q, char **x) {
@@ -132,7 +146,7 @@ int dequeue(struct queue *Q, char **x) {
     struct queueNode *alpha = Q->front->next;
 
     if (alpha == NULL) {
-        pthread_mutex_unlock(&Q->frontLock);
+        pthread_mutex_unlock(&threadLock);
         return -1;
     }
 
@@ -146,25 +160,50 @@ int dequeue(struct queue *Q, char **x) {
 }
 
 // Functions that handle the grep handler logic
-void threadCreator(const char *search_string) {
-    // For now, the struct will only be created to accomodate one worker
-    struct threadData t_data[1];
-    t_data[0].searchString = search_string;
-    t_data[0].workerNumber = 0;
-    threadHandler(&t_data[0]);
+void threadCreator(const char *search_string, long N) {
+    pthread_t threads[N];
+    struct threadData t_data[N];
+
+    for (int i=0; i<N; i++) {
+        t_data[i].searchString = search_string;
+        t_data[i].workerNumber = i;
+        pthread_create(&threads[i], NULL, (void *) threadHandler, &t_data[i]);
+    }
+
+    for (int i=0; i<N; i++) {
+        pthread_join(threads[i], NULL);
+    }
+    printf("Finished\n");
 }
 
 void threadHandler(struct threadData *t_data) {
     // Will be used to hold the dequeued paths
+    pthread_mutex_lock(&threadLock);
     char *str;
-    while(!isEmpty(&Q)) {
+    while(1) {
+        while (isEmpty(&Q) && numActiveThreads > 0) {
+            pthread_cond_wait(&threadQueue, &threadLock);
+        }
+        if (isEmpty(&Q) && numActiveThreads == 0) {
+            break;
+        }
+
+        // Dequeue
         if (dequeue(&Q, &str) == -1) {
             break;
         }
         t_data->str = str;
+        numActiveThreads++;
         printf("[%d] DIR %s\n", t_data->workerNumber, str);
+        pthread_mutex_unlock(&threadLock);
+        
         grepRunner(t_data);
+
+        pthread_mutex_lock(&threadLock);
+        numActiveThreads--;
+        pthread_cond_broadcast(&threadQueue);
     }
+    pthread_mutex_unlock(&threadLock);
 }
 
 void grepRunner(struct threadData *t_data) {
@@ -193,16 +232,22 @@ void grepRunner(struct threadData *t_data) {
 
             if (returnValue == 0) {
                 formPathName(path, t_data->str, entry->d_name);
+                pthread_mutex_lock(&threadLock);
                 printf("[%d] PRESENT %s\n", t_data->workerNumber, path);
+                pthread_mutex_unlock(&threadLock);
             }
             else {
                 formPathName(path, t_data->str, entry->d_name);
-                printf("[%d] ABSENT %s\n", t_data->workerNumber, path);                
+                pthread_mutex_lock(&threadLock);
+                printf("[%d] ABSENT %s\n", t_data->workerNumber, path);    
+                pthread_mutex_unlock(&threadLock);            
             }
         }
         else if (entry->d_type == 4 && strcmp(entry->d_name, ".") != 0 && strcmp(entry->d_name, "..") != 0) {
                 formPathName(path, t_data->str, entry->d_name);
+                pthread_mutex_lock(&threadLock);
                 printf("[%d] ENQUEUE %s\n", t_data->workerNumber, path);
+                pthread_mutex_unlock(&threadLock);
                 enqueue(&Q, path);
         }
     }
