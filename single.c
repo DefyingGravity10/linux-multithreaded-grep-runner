@@ -163,8 +163,8 @@ void grepRunner(struct threadData *t_data) {
     // Initialization of required components
     DIR *dir;
     struct dirent *entry;
-    char command[500];
-    char path[255];
+    char *command = malloc(sizeof(char *)*strlen(t_data->str)*2);
+    char *path = malloc(sizeof(char *)*strlen(t_data->str)*2);
     int returnValue;
 
     dir = opendir(t_data->str);
@@ -198,6 +198,8 @@ void grepRunner(struct threadData *t_data) {
                 enqueue(&Q, path);
         }
     }
+    free(command);
+    free(path);
     closedir(dir);
     free(t_data->str);
 }

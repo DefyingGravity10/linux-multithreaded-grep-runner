@@ -18,7 +18,8 @@ struct queueNode {
 struct queue {
     struct queueNode *front;
     struct queueNode *rear;
-    pthread_mutex_t  frontLock, rearLock;
+    pthread_mutex_t  frontLock;
+    pthread_mutex_t  rearLock;
 };
 
 // Global variables used
@@ -113,8 +114,8 @@ void initQueue(struct queue *Q) {
     Q->rear = alpha;
 
     // Initialize the locks to be used for the queue
-    pthread_mutex_init(&Q->frontLock, NULL);
-    pthread_mutex_init(&Q->rearLock, NULL);    
+    if (pthread_mutex_init(&Q->frontLock, NULL) != 0) printf("Mutex frontLock has failed\n");
+    if (pthread_mutex_init(&Q->rearLock, NULL) != 0) printf("Mutex rearLock has failed\n");     
 }
 
 int isEmpty(struct queue *Q) {
@@ -216,8 +217,8 @@ void grepRunner(struct threadData *t_data) {
     // Initialization of required components
     DIR *dir;
     struct dirent *entry;
-    char command[500];
-    char path[255];
+    char *command = malloc(sizeof(char *)*strlen(t_data->str)*2);
+    char *path = malloc(sizeof(char *)*strlen(t_data->str)*2);
     int returnValue;
 
     dir = opendir(t_data->str);
@@ -257,6 +258,8 @@ void grepRunner(struct threadData *t_data) {
                 enqueue(&Q, path);
         }
     }
+    free(command);
+    free(path);
     closedir(dir);
     free(t_data->str);
 }
