@@ -169,8 +169,14 @@ void processTask(struct threadData *t_data) {
 
     dir = opendir(t_data->str);
     while ((entry = readdir(dir)) != NULL) {
+        // Implies that the entry is a directory
+        if (entry->d_type == 4 && strcmp(entry->d_name, ".") != 0 && strcmp(entry->d_name, "..") != 0) {
+                formPathName(path, t_data->str, entry->d_name);
+                printf("[%d] ENQUEUE %s\n", t_data->workerNumber, path);
+                enqueue(&Q, path);
+        }
         // Implies that the entry is a regular file
-        if (entry->d_type == 8) {
+        else if (entry->d_type == 8) {
             // Create the grep command to be used
             strcpy(command, "grep ");
             strcat(command, "\"");
@@ -195,11 +201,6 @@ void processTask(struct threadData *t_data) {
                 formPathName(path, t_data->str, entry->d_name);
                 printf("[%d] ABSENT %s\n", t_data->workerNumber, path);                
             }
-        }
-        else if (entry->d_type == 4 && strcmp(entry->d_name, ".") != 0 && strcmp(entry->d_name, "..") != 0) {
-                formPathName(path, t_data->str, entry->d_name);
-                printf("[%d] ENQUEUE %s\n", t_data->workerNumber, path);
-                enqueue(&Q, path);
         }
     }
     free(command);
