@@ -44,7 +44,7 @@ int dequeue(struct queue *Q, char **x);
 // Functions that facilitate in performing parallelized grep
 void threadCreator(const char *search_string, long N);
 void threadHandler(struct threadData *t_data);
-void grepRunner(struct threadData *t_data);
+void processTask(struct threadData *t_data);
 void formPathName(char *path, char *str, char *entryName);
 
 
@@ -203,7 +203,7 @@ void threadHandler(struct threadData *t_data) {
         printf("[%d] DIR %s\n", t_data->workerNumber, str);
         pthread_mutex_unlock(&threadLock);
         
-        grepRunner(t_data);
+        processTask(t_data);
 
         pthread_mutex_lock(&threadLock);
         numActiveThreads--;
@@ -213,7 +213,7 @@ void threadHandler(struct threadData *t_data) {
     pthread_mutex_unlock(&threadLock);
 }
 
-void grepRunner(struct threadData *t_data) {
+void processTask(struct threadData *t_data) {
     // Initialization of required components
     DIR *dir;
     struct dirent *entry;
