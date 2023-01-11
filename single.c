@@ -38,7 +38,7 @@ int dequeue(struct queue *Q, char **x);
 // For grep runner
 void threadCreator(const char *search_string);
 void threadHandler(struct threadData *t_data);
-void grepRunner(struct threadData *t_data);
+void processTask(struct threadData *t_data);
 void formPathName(char *path, char *str, char *entryName);
 
 
@@ -155,11 +155,11 @@ void threadHandler(struct threadData *t_data) {
         }
         t_data->str = str;
         printf("[%d] DIR %s\n", t_data->workerNumber, str);
-        grepRunner(t_data);
+        processTask(t_data);
     }
 }
 
-void grepRunner(struct threadData *t_data) {
+void processTask(struct threadData *t_data) {
     // Initialization of required components
     DIR *dir;
     struct dirent *entry;
