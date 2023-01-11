@@ -18,8 +18,6 @@ struct queueNode {
 struct queue {
     struct queueNode *front;
     struct queueNode *rear;
-    pthread_mutex_t  frontLock;
-    pthread_mutex_t  rearLock;
 };
 
 // Global variables used
@@ -93,9 +91,7 @@ int main(int argc, char* argv[]) {
     // Necessary so that we will not have memory leaks
     free(Q.front);
 
-    // Destroy the mutexes/cond variables used
-    pthread_mutex_destroy(&Q.frontLock);
-    pthread_mutex_destroy(&Q.rearLock);
+    // Destroy the mutex/cond variables used
     pthread_mutex_destroy(&threadLock);
     pthread_cond_destroy(&threadQueue);
 
@@ -111,11 +107,7 @@ void initQueue(struct queue *Q) {
 
     alpha->next = NULL;
     Q->front = alpha;
-    Q->rear = alpha;
-
-    // Initialize the locks to be used for the queue
-    if (pthread_mutex_init(&Q->frontLock, NULL) != 0) printf("Mutex frontLock has failed\n");
-    if (pthread_mutex_init(&Q->rearLock, NULL) != 0) printf("Mutex rearLock has failed\n");     
+    Q->rear = alpha;   
 }
 
 int isEmpty(struct queue *Q) {
@@ -137,27 +129,22 @@ void enqueue(struct queue *Q, char *x) {
     alpha->next = NULL;
 
     pthread_mutex_lock(&threadLock);
-    pthread_mutex_lock(&Q->rearLock);
     Q->rear->next = alpha;
     Q->rear = alpha;
-    pthread_mutex_unlock(&Q->rearLock);
     pthread_mutex_unlock(&threadLock);
 }
 
 int dequeue(struct queue *Q, char **x) {
-    pthread_mutex_lock(&Q->frontLock);
     struct queueNode *temp = Q->front;
     struct queueNode *alpha = Q->front->next;
 
     if (alpha == NULL) {
-        pthread_mutex_unlock(&threadLock);
         return -1;
     }
 
     // Let x be the new string
     *x = alpha->info;
     Q->front = alpha;
-    pthread_mutex_unlock(&Q->frontLock);
 
     free(temp);
     return 0;
