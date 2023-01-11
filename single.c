@@ -105,7 +105,7 @@ void enqueue(struct queue *Q, char *x) {
     assert(alpha != NULL);
 
     // Create a new copy of the str
-    char *str = malloc(sizeof(char)*255); 
+    char *str = malloc(sizeof(char)*1000); 
     strcpy(str, x);
 
     // Points to str
@@ -173,9 +173,13 @@ void grepRunner(struct threadData *t_data) {
         if (entry->d_type == 8) {
             // Create the grep command to be used
             strcpy(command, "grep ");
+            strcat(command, "\"");
             strcat(command, t_data->searchString);
+            strcat(command, "\"");
             strcat(command, " ");
+            strcat(command, "\"");
             strcat(command, t_data->str);
+            strcat(command, "\"");
             strcat(command, "/");
             strcat(command, entry->d_name);
             strcat(command, " 1> /dev/null 2> /dev/null");
