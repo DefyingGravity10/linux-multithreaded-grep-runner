@@ -172,8 +172,8 @@ void processTask(struct threadData *t_data) {
         // Implies that the entry is a directory
         if (entry->d_type == 4 && strcmp(entry->d_name, ".") != 0 && strcmp(entry->d_name, "..") != 0) {
                 formPathName(path, t_data->str, entry->d_name);
-                printf("[%d] ENQUEUE %s\n", t_data->workerNumber, path);
                 enqueue(&Q, path);
+                printf("[%d] ENQUEUE %s\n", t_data->workerNumber, path);
         }
         // Implies that the entry is a regular file
         else if (entry->d_type == 8) {
