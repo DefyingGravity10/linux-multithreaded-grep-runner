@@ -112,10 +112,8 @@ void enqueue(struct queue *Q, char *x) {
     alpha->info = str;
     alpha->next = NULL;
 
-    // Add lock here
     Q->rear->next = alpha;
     Q->rear = alpha;
-    // Unlock here
 }
 
 int dequeue(struct queue *Q, char **x) {
@@ -124,14 +122,12 @@ int dequeue(struct queue *Q, char **x) {
     struct queueNode *alpha = Q->front->next;
 
     if (alpha == NULL) {
-        // Unlock
         return -1;
     }
 
     // Let x be the new string
     *x = alpha->info;
     Q->front = alpha;
-    // Unlock
 
     free(temp);
     return 0;
