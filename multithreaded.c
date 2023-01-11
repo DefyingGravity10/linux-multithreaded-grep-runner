@@ -129,7 +129,7 @@ void enqueue(struct queue *Q, char *x) {
     assert(alpha != NULL);
 
     // Create a new copy of the str
-    char *str = malloc(sizeof(char)*255); 
+    char *str = malloc(sizeof(char)*strlen(x)); 
     strcpy(str, x);
 
     // Points to str
@@ -198,9 +198,9 @@ void threadHandler(struct threadData *t_data) {
             break;
         }
         // Update str (i.e. the directory)
+        printf("[%d] DIR %s\n", t_data->workerNumber, str);
         t_data->str = str;
         numActiveThreads++;
-        printf("[%d] DIR %s\n", t_data->workerNumber, str);
         pthread_mutex_unlock(&threadLock);
         
         processTask(t_data);
