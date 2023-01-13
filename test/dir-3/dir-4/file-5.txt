@@ -1,0 +1,5 @@
+triangle
+circle
+square
+rectangle
+diamond
