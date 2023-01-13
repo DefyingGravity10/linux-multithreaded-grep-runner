@@ -37,7 +37,7 @@ int dequeue(struct queue *Q, char **x);
 
 // For grep runner
 void threadCreator(const char *search_string);
-void threadHandler(struct threadData *t_data);
+void *threadHandler(struct threadData *t_data);
 void processTask(struct threadData *t_data);
 void formPathName(char *path, char *str, char *entryName);
 
@@ -149,7 +149,7 @@ void threadCreator(const char *search_string) {
     threadHandler(&t_data[0]);
 }
 
-void threadHandler(struct threadData *t_data) {
+void *threadHandler(struct threadData *t_data) {
     // Will be used to hold the dequeued paths
     char *str;
     while(!isEmpty(&Q)) {

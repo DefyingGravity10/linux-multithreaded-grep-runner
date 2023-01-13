@@ -41,7 +41,7 @@ int dequeue(struct queue *Q, char **x);
 
 // Functions that facilitate in performing parallelized grep
 void threadCreator(const char *search_string, long N);
-void threadHandler(struct threadData *t_data);
+void *threadHandler(struct threadData *t_data);
 void processTask(struct threadData *t_data);
 void formPathName(char *path, char *str, char *entryName);
 
@@ -174,7 +174,7 @@ void threadCreator(const char *search_string, long N) {
     }
 }
 
-void threadHandler(struct threadData *t_data) {
+void *threadHandler(struct threadData *t_data) {
     pthread_mutex_lock(&threadLock);
     char *str;  // Will be used to hold the dequeued paths
     while(1) {
