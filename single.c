@@ -48,7 +48,7 @@ int main(int argc, char* argv[]) {
     //We also assume that the path is correctly formatted.
 
     char *numberOfWorkers = argv[1];  // This is ignored for now
-    char *rootpath = argv[2];
+    char *tempRootpath = argv[2];
     const char *search_string = argv[3];
 
     // This portion is not directly helpful for single.c, which explains 
@@ -59,6 +59,12 @@ int main(int argc, char* argv[]) {
 
     // Initialize the queue
     initQueue(&Q);
+
+    char *rootpath = malloc(sizeof(char *)*255);
+    strcpy(rootpath, tempRootpath);
+    if (rootpath[strlen(rootpath)-1] == '/') {
+        rootpath[strlen(rootpath)-1] = '\0';
+    }
 
     // Check if the path provided is a relative or absolute path
     if (rootpath[0] == '/') {
@@ -78,6 +84,7 @@ int main(int argc, char* argv[]) {
     }
 
     // Necessary so that we will not have memory leaks
+    free(rootpath);    
     free(Q.front);
 
     return 0;
@@ -135,7 +142,7 @@ int dequeue(struct queue *Q, char **x) {
 
 // Functions that handle the grep handler logic
 void threadCreator(const char *search_string) {
-    // For now, the struct will only be created to accomodate one worker
+    // For now, the struct will only be created to accomodate one worker (main)
     struct threadData t_data[1];
     t_data[0].searchString = search_string;
     t_data[0].workerNumber = 0;

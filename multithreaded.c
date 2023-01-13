@@ -52,7 +52,7 @@ int main(int argc, char* argv[]) {
     //We also assume that the path is correctly formatted.
 
     char *numberOfWorkers = argv[1]; 
-    char *rootpath = argv[2];
+    char *tempRootpath = argv[2];
     const char *search_string = argv[3];
 
     // Process the number of workers
@@ -71,6 +71,12 @@ int main(int argc, char* argv[]) {
         printf("Cond variable threadQueue has failed\n");
     }
     
+    char *rootpath = malloc(sizeof(char *)*255);
+    strcpy(rootpath, tempRootpath);
+    if (rootpath[strlen(rootpath)-1] == '/') {
+        rootpath[strlen(rootpath)-1] = '\0';
+    }
+
     // Check if the path provided is a relative or absolute path
     if (rootpath[0] == '/') {   // Absolute
         enqueue(&Q, rootpath);
@@ -89,6 +95,7 @@ int main(int argc, char* argv[]) {
     }
 
     // Necessary so that we will not have memory leaks
+    free(rootpath);
     free(Q.front);
 
     // Destroy the mutex/cond variables used
